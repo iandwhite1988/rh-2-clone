@@ -266,79 +266,339 @@ function update(dt) {
 
 // ===== RENDER =====
 function draw() {
-  ctx.fillStyle = '#1a2a1a';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Clear
+  ctx.fillStyle = '#0c1a0c';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // tiles
-  const startX = Math.floor(camera.x/TILE);
-  const startY = Math.floor(camera.y/TILE);
-  const endX = startX + Math.ceil(canvas.width/TILE)+1;
-  const endY = startY + Math.ceil(canvas.height/TILE)+1;
+  // Camera bounds
+  const startX = Math.max(0, Math.floor(camera.x / TILE) - 1);
+  const startY = Math.max(0, Math.floor(camera.y / TILE) - 1);
+  const endX = Math.min(MAP_W, startX + Math.ceil(canvas.width / TILE) + 2);
+  const endY = Math.min(MAP_H, startY + Math.ceil(canvas.height / TILE) + 2);
 
-  for (let y=startY; y<endY; y++) {
-    for (let x=startX; x<endX; x++) {
-      if (x<0||y<0||x>=MAP_W||y>=MAP_H) continue;
-      const px = x*TILE - camera.x;
-      const py = y*TILE - camera.y;
-      ctx.fillStyle = map[y][x]===1 ? '#886600' : '#2a4a2a';
-      ctx.fillRect(px, py, TILE-1, TILE-1);
-    }
-  }
+  // ===== TILES =====
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
+      const px = x * TILE - camera.x;
+      const py = y * TILE - camera.y;
 
-  // entities
-  for (const e of entities) {
-    const px = e.x*TILE - camera.x;
-    const py = e.y*TILE - camera.y;
-    const w = (e.w||1)*TILE;
-    const h = (e.h||1)*TILE;
+      if (map[y][x] === 1) {
+        // Ore – textured look
+        ctx.fillStyle = '#5c4a1a';
+        ctx.fillRect(px, py, TILE - 1, TILE - 1);
 
-    // body
-    if (e.isBuilding) {
-      ctx.fillStyle = e.type==='conyard' ? '#446644' :
-                      e.type==='power' ? '#5555aa' :
-                      e.type==='barracks' ? '#aa5555' :
-                      e.type==='factory' ? '#888855' : '#aa8844';
-      ctx.fillRect(px, py, w, h);
-      ctx.strokeStyle = '#0f0';
-      ctx.strokeRect(px, py, w, h);
-    } else {
-      ctx.fillStyle = e.type==='tank' ? '#668866' :
-                      e.type==='harvester' ? '#aa9944' : '#88aa88';
-      ctx.beginPath();
-      ctx.arc(px+TILE/2, py+TILE/2, TILE*0.4, 0, Math.PI*2);
-      ctx.fill();
-      if (e.type==='harvester' && e.cargo>0) {
-        ctx.fillStyle = '#ffcc00';
-        ctx.fillRect(px+8, py+4, 16*(e.cargo/e.maxCargo), 4);
+        // Ore nuggets
+        ctx.fillStyle = '#c9a227';
+        ctx.beginPath();
+        ctx.arc(px + 10, py + 12, 4, 0, Math.PI * 2);
+        ctx.arc(px + 20, py + 18, 3.5, 0, Math.PI * 2);
+        ctx.arc(px + 14, py + 22, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Shine
+        ctx.fillStyle = 'rgba(255, 230, 120, 0.5)';
+        ctx.beginPath();
+        ctx.arc(px + 10, py + 11, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Grass with variation
+        const shade = ((x * 3 + y * 7) % 5);
+        const colors = ['#1a331a', '#1e3a1e', '#183018', '#1c361c', '#163016'];
+        ctx.fillStyle = colors[shade];
+        ctx.fillRect(px, py, TILE - 1, TILE - 1);
       }
     }
-
-    // health bar
-    if (e.hp < e.maxHp) {
-      ctx.fillStyle = '#300';
-      ctx.fillRect(px, py-6, w, 4);
-      ctx.fillStyle = e.hp/e.maxHp > 0.5 ? '#0f0' : '#f00';
-      ctx.fillRect(px, py-6, w*(e.hp/e.maxHp), 4);
-    }
-
-    // selection
-    if (e.selected) {
-      ctx.strokeStyle = '#0ff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(px-2, py-2, w+4, h+4);
-      ctx.lineWidth = 1;
-    }
   }
 
-  // build preview
+  // ===== ENTITIES =====
+  for (const e of entities) {
+    drawEntity(e);
+  }
+
+  // Build preview
   if (buildMode) {
-    const tx = Math.floor(mouse.x/TILE)*TILE - camera.x;
-    const ty = Math.floor(mouse.y/TILE)*TILE - camera.y;
-    ctx.fillStyle = 'rgba(0,255,0,0.3)';
-    ctx.fillRect(tx, ty, TILE, TILE);
+    const tx = Math.floor(mouse.x / TILE);
+    const ty = Math.floor(mouse.y / TILE);
+    const size = buildMode === 'refinery' ? 2 : 1;
+    const px = tx * TILE - camera.x;
+    const py = ty * TILE - camera.y;
+
+    ctx.fillStyle = 'rgba(0, 255, 100, 0.25)';
+    ctx.fillRect(px, py, size * TILE, size * TILE);
+    ctx.strokeStyle = '#0f0';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(px + 1, py + 1, size * TILE - 2, size * TILE - 2);
+    ctx.setLineDash([]);
   }
 
   requestAnimationFrame(loop);
+}
+
+function drawEntity(e) {
+  const px = e.x * TILE - camera.x;
+  const py = e.y * TILE - camera.y;
+  const w = (e.w || 1) * TILE;
+  const h = (e.h || 1) * TILE;
+
+  if (e.isBuilding) {
+    drawBuilding(e, px, py, w, h);
+  } else {
+    drawUnit(e, px, py, TILE);
+  }
+
+  // Health bar
+  if (e.hp < e.maxHp) {
+    const barW = Math.max(w, 20);
+    ctx.fillStyle = '#1a0000';
+    ctx.fillRect(px, py - 8, barW, 5);
+    const ratio = Math.max(0, e.hp / e.maxHp);
+    ctx.fillStyle = ratio > 0.5 ? '#22cc22' : ratio > 0.25 ? '#cccc22' : '#cc2222';
+    ctx.fillRect(px, py - 8, barW * ratio, 5);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py - 8, barW, 5);
+  }
+
+  // Selection brackets
+  if (e.selected) {
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 1.5;
+    const s = 6;
+    // Top-left
+    ctx.beginPath();
+    ctx.moveTo(px, py + s);
+    ctx.lineTo(px, py);
+    ctx.lineTo(px + s, py);
+    ctx.stroke();
+    // Top-right
+    ctx.beginPath();
+    ctx.moveTo(px + w - s, py);
+    ctx.lineTo(px + w, py);
+    ctx.lineTo(px + w, py + s);
+    ctx.stroke();
+    // Bottom-left
+    ctx.beginPath();
+    ctx.moveTo(px, py + h - s);
+    ctx.lineTo(px, py + h);
+    ctx.lineTo(px + s, py + h);
+    ctx.stroke();
+    // Bottom-right
+    ctx.beginPath();
+    ctx.moveTo(px + w - s, py + h);
+    ctx.lineTo(px + w, py + h);
+    ctx.lineTo(px + w, py + h - s);
+    ctx.stroke();
+  }
+}
+
+function drawBuilding(e, px, py, w, h) {
+  switch (e.type) {
+    case 'conyard':
+      // Large industrial base
+      ctx.fillStyle = '#3d5c3d';
+      ctx.fillRect(px, py, w, h);
+      // Roof sections
+      ctx.fillStyle = '#2a402a';
+      ctx.fillRect(px + 4, py + 4, w - 8, 18);
+      // Crane / arm
+      ctx.fillStyle = '#555';
+      ctx.fillRect(px + w - 18, py + 8, 10, 40);
+      ctx.fillStyle = '#777';
+      ctx.fillRect(px + w - 28, py + 12, 22, 6);
+      // Windows
+      ctx.fillStyle = '#88aacc';
+      ctx.fillRect(px + 10, py + 30, 12, 8);
+      ctx.fillRect(px + 28, py + 30, 12, 8);
+      break;
+
+    case 'power':
+      // Power plant with smokestack
+      ctx.fillStyle = '#2a4a6a';
+      ctx.fillRect(px, py + 8, w, h - 8);
+      // Smokestack
+      ctx.fillStyle = '#444';
+      ctx.fillRect(px + 10, py, 12, 20);
+      ctx.fillStyle = '#666';
+      ctx.fillRect(px + 12, py - 4, 8, 6);
+      // Vents
+      ctx.fillStyle = '#1a2a3a';
+      ctx.fillRect(px + 4, py + 18, 8, 6);
+      ctx.fillRect(px + 20, py + 18, 8, 6);
+      break;
+
+    case 'barracks':
+      // Barracks – long building
+      ctx.fillStyle = '#5a3a3a';
+      ctx.fillRect(px, py, w, h);
+      // Roof
+      ctx.fillStyle = '#3a2525';
+      ctx.fillRect(px + 2, py + 2, w - 4, 10);
+      // Door
+      ctx.fillStyle = '#222';
+      ctx.fillRect(px + 10, py + 18, 12, 12);
+      // Windows
+      ctx.fillStyle = '#aaccff';
+      ctx.fillRect(px + 4, py + 14, 6, 5);
+      ctx.fillRect(px + 22, py + 14, 6, 5);
+      break;
+
+    case 'factory':
+      // War Factory
+      ctx.fillStyle = '#5a5a2a';
+      ctx.fillRect(px, py, w, h);
+      // Large door
+      ctx.fillStyle = '#333';
+      ctx.fillRect(px + 8, py + 20, w - 16, 24);
+      // Roof machinery
+      ctx.fillStyle = '#777';
+      ctx.fillRect(px + 6, py + 4, 20, 10);
+      ctx.fillRect(px + 30, py + 6, 16, 8);
+      break;
+
+    case 'refinery':
+      // Ore Refinery
+      ctx.fillStyle = '#6a4a2a';
+      ctx.fillRect(px, py, w, h);
+      // Silo
+      ctx.fillStyle = '#8a6a3a';
+      ctx.beginPath();
+      ctx.arc(px + 20, py + 22, 16, 0, Math.PI * 2);
+      ctx.fill();
+      // Conveyor / pad
+      ctx.fillStyle = '#444';
+      ctx.fillRect(px + 36, py + 28, 24, 14);
+      // Pipe
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(px + 30, py + 18);
+      ctx.lineTo(px + 42, py + 28);
+      ctx.stroke();
+      break;
+
+    default:
+      ctx.fillStyle = '#555';
+      ctx.fillRect(px, py, w, h);
+  }
+
+  // Building outline
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+}
+
+function drawUnit(e, px, py, TILE) {
+  const cx = px + TILE / 2;
+  const cy = py + TILE / 2;
+
+  switch (e.type) {
+    case 'gi': {
+      // Infantry – small soldier
+      // Body
+      ctx.fillStyle = '#4a7a4a';
+      ctx.fillRect(cx - 4, cy - 2, 8, 10);
+      // Head
+      ctx.fillStyle = '#d4a574';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 6, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Helmet
+      ctx.fillStyle = '#3a5a3a';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 7, 3.8, Math.PI, 0);
+      ctx.fill();
+      // Gun
+      ctx.fillStyle = '#333';
+      ctx.fillRect(cx + 3, cy - 1, 7, 2);
+      break;
+    }
+
+    case 'rocketeer': {
+      // Flying infantry
+      ctx.fillStyle = '#3a6aaa';
+      ctx.fillRect(cx - 4, cy - 2, 8, 9);
+      // Head
+      ctx.fillStyle = '#d4a574';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 6, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      // Jetpack flames
+      ctx.fillStyle = '#ff6600';
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy + 8);
+      ctx.lineTo(cx - 2, cy + 14);
+      ctx.lineTo(cx + 1, cy + 8);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx + 1, cy + 8);
+      ctx.lineTo(cx + 4, cy + 14);
+      ctx.lineTo(cx + 7, cy + 8);
+      ctx.fill();
+      break;
+    }
+
+    case 'tank': {
+      // Grizzly Tank
+      // Tracks
+      ctx.fillStyle = '#333';
+      ctx.fillRect(cx - 12, cy + 4, 24, 7);
+      // Hull
+      ctx.fillStyle = '#5a7a5a';
+      ctx.fillRect(cx - 11, cy - 4, 22, 10);
+      // Turret
+      ctx.fillStyle = '#4a6a4a';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 2, 7, 0, Math.PI * 2);
+      ctx.fill();
+      // Barrel
+      ctx.fillStyle = '#333';
+      ctx.fillRect(cx + 5, cy - 4, 14, 3);
+      break;
+    }
+
+    case 'ifv': {
+      // Infantry Fighting Vehicle
+      ctx.fillStyle = '#333';
+      ctx.fillRect(cx - 11, cy + 3, 22, 6);
+      ctx.fillStyle = '#6a8a4a';
+      ctx.fillRect(cx - 10, cy - 5, 20, 10);
+      // Turret
+      ctx.fillStyle = '#5a7a3a';
+      ctx.fillRect(cx - 4, cy - 8, 8, 6);
+      // Barrel
+      ctx.fillStyle = '#222';
+      ctx.fillRect(cx + 3, cy - 7, 10, 2);
+      break;
+    }
+
+    case 'harvester': {
+      // Chrono Miner / Ore Truck
+      // Body
+      ctx.fillStyle = '#8a7a30';
+      ctx.fillRect(cx - 13, cy - 6, 26, 14);
+      // Cabin
+      ctx.fillStyle = '#6a5a20';
+      ctx.fillRect(cx - 13, cy - 10, 10, 8);
+      // Wheel / tracks
+      ctx.fillStyle = '#333';
+      ctx.fillRect(cx - 12, cy + 6, 8, 5);
+      ctx.fillRect(cx + 4, cy + 6, 8, 5);
+      // Cargo indicator
+      if (e.cargo > 0) {
+        const load = e.cargo / e.maxCargo;
+        ctx.fillStyle = '#c9a227';
+        ctx.fillRect(cx - 2, cy - 4, 12 * load, 8);
+      }
+      break;
+    }
+
+    default:
+      ctx.fillStyle = '#888';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+      ctx.fill();
+  }
 }
 
 function updateUI() {
