@@ -1,61 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RA2 Clone — Full Build</title>
-    <meta name="description" content="A Red Alert 2 style real-time strategy game running entirely in the browser on HTML canvas." />
-    <link rel="stylesheet" href="styles.css" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23c8342a'/><path d='M8 22 L16 8 L24 22 Z' fill='%23ffd75e'/></svg>"
-    />
-  </head>
-  <body>
-    <div id="app">
-      <main id="viewport">
-        <canvas id="game"></canvas>
-        <div id="messages"></div>
-        <div id="cursor-hint"></div>
-      </main>
-
-      <aside id="sidebar">
-        <header class="brand">
-          <span class="brand-mark">RA</span>
-          <span class="brand-text">
-            <strong>Red Alert 2</strong>
-            <small>browser clone</small>
-          </span>
-        </header>
-
-        <section class="stats">
-          <div class="stat-row">
-            <span class="label">Credits</span>
-            <span id="credits" class="value">$0</span>
-          </div>
-          <div class="power">
-            <div class="power-bar"><div id="power-fill"></div></div>
-            <span id="power-text" class="label">0 / 0</span>
-          </div>
-        </section>
-
-        <canvas id="minimap" width="180" height="180"></canvas>
-
-        <nav id="tabs"></nav>
-        <div id="build-list"></div>
-        <section id="selection-info"></section>
-
-        <footer id="help">
-          <div><b>LMB</b> select · <b>RMB</b> move / attack</div>
-          <div><b>Drag</b> box select · <b>A</b> attack-move · <b>S</b> stop</div>
-          <div><b>Arrows</b> / screen edge scroll · <b>H</b> base</div>
-          <div><b>Ctrl+1-9</b> set group · <b>1-9</b> recall · <b>Space</b> pause</div>
-        </footer>
-      </aside>
+<head>
+<meta charset="UTF-8">
+<title>Red Alert 2 Clone – Modular Build</title>
+<style>
+  body { margin: 0; background: #111; color: #0f0; font-family: monospace; overflow: hidden; }
+  #wrap { display: flex; height: 100vh; }
+  #viewport { position: relative; flex: 1; min-width: 0; }
+  canvas { display: block; cursor: crosshair; }
+  #message {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.75); border: 1px solid #0f0; padding: 5px 14px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  #hint {
+    position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6);
+    border: 1px solid #063; padding: 6px 10px; font-size: 11px; line-height: 1.6; color: #6c6;
+  }
+  #sidebar {
+    width: 220px; flex: 0 0 220px; background: #1a1a1a; border-left: 2px solid #0f0;
+    padding: 10px; box-sizing: border-box; overflow-y: auto;
+  }
+  #sidebar h3 { margin: 14px 0 6px; font-size: 12px; letter-spacing: .08em; color: #7c7; border-bottom: 1px solid #063; padding-bottom: 3px; }
+  .credits { font-size: 17px; margin-bottom: 4px; }
+  .selected { font-size: 11px; color: #7c7; margin-bottom: 6px; }
+  button.item {
+    display: block; width: 100%; margin: 3px 0; background: #003300; color: #0f0;
+    border: 1px solid #0f0; padding: 6px; cursor: pointer; font: inherit; font-size: 11px; text-align: left;
+  }
+  button.item:hover { background: #005500; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="viewport">
+      <canvas id="game"></canvas>
+      <div id="message"></div>
+      <div id="hint">
+        Left-click select / place &middot; drag to box-select<br>
+        Right-click move / attack &middot; Esc cancel<br>
+        WASD or arrows pan the camera
+      </div>
     </div>
-
-    <div id="overlay" class="hidden"></div>
-
-    <script type="module" src="src/main.js"></script>
-  </body>
+    <div id="sidebar"></div>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
 </html>
