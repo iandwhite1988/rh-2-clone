@@ -1,61 +1,362 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RA2 Clone — Browser RTS</title>
-    <meta name="description" content="A Red Alert 2 style real-time strategy game running entirely in the browser on HTML canvas." />
-    <link rel="stylesheet" href="styles.css" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23c8342a'/><path d='M8 22 L16 8 L24 22 Z' fill='%23ffd75e'/></svg>"
-    />
-  </head>
-  <body>
-    <div id="app">
-      <main id="viewport">
-        <canvas id="game"></canvas>
-        <div id="messages"></div>
-        <div id="cursor-hint"></div>
-      </main>
+<head>
+<meta charset="UTF-8">
+<title>Red Alert 2 Clone – Prototype</title>
+<style>
+  body { margin: 0; background: #111; color: #0f0; font-family: monospace; overflow: hidden; }
+  #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid #0f0; z-index: 10; }
+  #sidebar { position: absolute; right: 0; top: 0; width: 180px; height: 100%; background: #1a1a1a; border-left: 2px solid #0f0; padding: 10px; box-sizing: border-box; }
+  button { display: block; width: 100%; margin: 5px 0; background: #003300; color: #0f0; border: 1px solid #0f0; padding: 8px; cursor: pointer; }
+  button:hover { background: #005500; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #credits { font-size: 18px; margin-bottom: 15px; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div>Credits: <span id="credits">5000</span></div>
+  <div>Selected: <span id="selected">None</span></div>
+  <div style="font-size:12px;margin-top:8px">Left-click: select / place<br>Right-click: move / attack<br>WASD or arrows: pan camera</div>
+</div>
+<div id="sidebar">
+  <div id="credits">Credits: 5000</div>
+  <h3>Build</h3>
+  <button onclick="setBuildMode('power')">Power Plant ($300)</button>
+  <button onclick="setBuildMode('barracks')">Barracks ($500)</button>
+  <button onclick="setBuildMode('factory')">War Factory ($800)</button>
+  <button onclick="setBuildMode('refinery')">Refinery ($1000)</button>
+  <h3>Produce</h3>
+  <button onclick="produce('gi')">GI ($200)</button>
+  <button onclick="produce('tank')">Grizzly Tank ($700)</button>
+  <button onclick="produce('harvester')">Harvester ($1000)</button>
+</div>
+<canvas id="game"></canvas>
 
-      <aside id="sidebar">
-        <header class="brand">
-          <span class="brand-mark">RA</span>
-          <span class="brand-text">
-            <strong>Red Alert 2</strong>
-            <small>browser clone</small>
-          </span>
-        </header>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth - 180;
+canvas.height = window.innerHeight;
 
-        <section class="stats">
-          <div class="stat-row">
-            <span class="label">Credits</span>
-            <span id="credits" class="value">$0</span>
-          </div>
-          <div class="power">
-            <div class="power-bar"><div id="power-fill"></div></div>
-            <span id="power-text" class="label">0 / 0</span>
-          </div>
-        </section>
+// ===== GAME STATE =====
+const TILE = 32;
+const MAP_W = 60, MAP_H = 40;
+let credits = 5000;
+let camera = { x: 0, y: 0 };
+let selected = [];
+let buildMode = null;
+let entities = [];
+let nextId = 1;
 
-        <canvas id="minimap" width="180" height="180"></canvas>
+// Simple map: 0=grass, 1=ore
+const map = Array.from({length: MAP_H}, () => Array(MAP_W).fill(0));
+// Place some ore fields
+for (let i = 0; i < 8; i++) {
+  const ox = 10 + Math.floor(Math.random()*40);
+  const oy = 8 + Math.floor(Math.random()*25);
+  for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) {
+    if (Math.random() > 0.3) map[oy+dy][ox+dx] = 1;
+  }
+}
 
-        <nav id="tabs"></nav>
-        <div id="build-list"></div>
-        <section id="selection-info"></section>
+// ===== ENTITY FACTORY =====
+function createBuilding(type, x, y, owner=0) {
+  const costs = { power:300, barracks:500, factory:800, refinery:1000 };
+  const hp = { power:400, barracks:600, factory:800, refinery:700 };
+  return {
+    id: nextId++, type, x, y, owner,
+    hp: hp[type], maxHp: hp[type],
+    w: type==='refinery'?2:1, h: type==='refinery'?2:1,
+    isBuilding: true, selected: false
+  };
+}
+function createUnit(type, x, y, owner=0) {
+  const stats = {
+    gi:       { hp:120, speed:1.4, range:4, dmg:15, cost:200 },
+    tank:     { hp:300, speed:1.0, range:5, dmg:40, cost:700 },
+    harvester:{ hp:250, speed:0.9, range:0, dmg:0,  cost:1000, cargo:0, maxCargo:700 }
+  };
+  const s = stats[type];
+  return {
+    id: nextId++, type, x, y, owner,
+    hp: s.hp, maxHp: s.hp, speed: s.speed, range: s.range, dmg: s.dmg,
+    target: null, path: [], isUnit: true, selected: false,
+    cargo: s.cargo||0, maxCargo: s.maxCargo||0, harvesting: false
+  };
+}
 
-        <footer id="help">
-          <div><b>LMB</b> select · <b>RMB</b> move / attack</div>
-          <div><b>Drag</b> box select · <b>A</b> attack-move · <b>S</b> stop</div>
-          <div><b>Arrows</b> / screen edge scroll · <b>H</b> base</div>
-          <div><b>Ctrl+1-9</b> set group · <b>1-9</b> recall · <b>Space</b> pause</div>
-        </footer>
-      </aside>
-    </div>
+// Starting Construction Yard
+entities.push(createBuilding('power', 5, 5)); // temporary power so we can build
+entities.push({
+  id: nextId++, type: 'conyard', x: 4, y: 4, owner: 0,
+  hp: 1000, maxHp: 1000, w: 2, h: 2, isBuilding: true, selected: false
+});
 
-    <div id="overlay" class="hidden"></div>
+// ===== INPUT =====
+let mouse = { x:0, y:0, down:false, right:false };
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left + camera.x;
+  mouse.y = e.clientY - rect.top + camera.y;
+});
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 0) { // left
+    mouse.down = true;
+    handleLeftClick();
+  } else if (e.button === 2) {
+    handleRightClick();
+  }
+});
+canvas.addEventListener('mouseup', () => mouse.down = false);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-    <script type="module" src="src/main.js"></script>
-  </body>
+document.addEventListener('keydown', e => {
+  const speed = 12;
+  if (e.key === 'w' || e.key === 'ArrowUp') camera.y -= speed;
+  if (e.key === 's' || e.key === 'ArrowDown') camera.y += speed;
+  if (e.key === 'a' || e.key === 'ArrowLeft') camera.x -= speed;
+  if (e.key === 'd' || e.key === 'ArrowRight') camera.x += speed;
+});
+
+function setBuildMode(type) { buildMode = type; }
+function produce(type) {
+  const costs = { gi:200, tank:700, harvester:1000 };
+  if (credits < costs[type]) return;
+  // Find a barracks or factory
+  const producer = entities.find(e => e.owner===0 && (
+    (type==='gi' && e.type==='barracks') ||
+    ((type==='tank'||type==='harvester') && e.type==='factory')
+  ));
+  if (!producer) return alert('Need Barracks (GI) or War Factory (vehicles)');
+  credits -= costs[type];
+  // Spawn near the building
+  const u = createUnit(type, producer.x + 2 + Math.random(), producer.y + 1 + Math.random());
+  entities.push(u);
+  updateUI();
+}
+
+function handleLeftClick() {
+  const tx = Math.floor(mouse.x / TILE);
+  const ty = Math.floor(mouse.y / TILE);
+
+  if (buildMode) {
+    const cost = { power:300, barracks:500, factory:800, refinery:1000 }[buildMode];
+    if (credits >= cost) {
+      // simple placement check
+      const b = createBuilding(buildMode, tx, ty);
+      entities.push(b);
+      credits -= cost;
+      buildMode = null;
+      updateUI();
+    }
+    return;
+  }
+
+  // Select units/buildings
+  selected = [];
+  entities.forEach(e => e.selected = false);
+  for (const e of entities) {
+    if (e.owner !== 0) continue;
+    const ex = e.x * TILE, ey = e.y * TILE;
+    const ew = (e.w||1)*TILE, eh = (e.h||1)*TILE;
+    if (mouse.x >= ex && mouse.x < ex+ew && mouse.y >= ey && mouse.y < ey+eh) {
+      e.selected = true;
+      selected.push(e);
+    }
+  }
+  updateUI();
+}
+
+function handleRightClick() {
+  if (selected.length === 0) return;
+  const tx = mouse.x / TILE;
+  const ty = mouse.y / TILE;
+
+  // Check if clicking enemy
+  let enemy = null;
+  for (const e of entities) {
+    if (e.owner === 0) continue;
+    const dist = Math.hypot(e.x - tx, e.y - ty);
+    if (dist < 1.5) { enemy = e; break; }
+  }
+
+  for (const u of selected) {
+    if (!u.isUnit) continue;
+    if (enemy) {
+      u.target = enemy;
+      u.path = [];
+    } else {
+      u.target = null;
+      u.path = [{x: tx, y: ty}]; // simple direct move for now
+    }
+  }
+}
+
+// ===== UPDATE =====
+function update(dt) {
+  for (const e of entities) {
+    if (!e.isUnit) continue;
+
+    // Harvester logic
+    if (e.type === 'harvester') {
+      if (e.cargo >= e.maxCargo) {
+        // return to nearest refinery
+        const ref = entities.find(b => b.type==='refinery' && b.owner===0);
+        if (ref) {
+          const dist = Math.hypot(e.x - (ref.x+1), e.y - (ref.y+1));
+          if (dist < 1.5) {
+            credits += e.cargo;
+            e.cargo = 0;
+            updateUI();
+          } else {
+            e.path = [{x: ref.x+1, y: ref.y+1}];
+          }
+        }
+      } else {
+        // find ore
+        let best = null, bestD = 999;
+        for (let y=0; y<MAP_H; y++) for (let x=0; x<MAP_W; x++) {
+          if (map[y][x] === 1) {
+            const d = Math.hypot(e.x-x, e.y-y);
+            if (d < bestD) { bestD=d; best={x,y}; }
+          }
+        }
+        if (best) {
+          if (bestD < 1.2) {
+            map[best.y][best.x] = 0; // mine
+            e.cargo = Math.min(e.maxCargo, e.cargo + 50);
+          } else {
+            e.path = [best];
+          }
+        }
+      }
+    }
+
+    // Combat
+    if (e.target && e.target.hp > 0) {
+      const dist = Math.hypot(e.x - e.target.x, e.y - e.target.y);
+      if (dist <= e.range) {
+        e.target.hp -= e.dmg * dt * 0.6;
+        if (e.target.hp <= 0) {
+          entities = entities.filter(en => en.id !== e.target.id);
+          e.target = null;
+        }
+        continue; // don't move while shooting
+      } else {
+        e.path = [{x: e.target.x, y: e.target.y}];
+      }
+    }
+
+    // Movement
+    if (e.path && e.path.length) {
+      const goal = e.path[0];
+      const dx = goal.x - e.x, dy = goal.y - e.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.15) {
+        e.path.shift();
+      } else {
+        e.x += (dx/dist) * e.speed * dt;
+        e.y += (dy/dist) * e.speed * dt;
+      }
+    }
+  }
+}
+
+// ===== RENDER =====
+function draw() {
+  ctx.fillStyle = '#1a2a1a';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // tiles
+  const startX = Math.floor(camera.x/TILE);
+  const startY = Math.floor(camera.y/TILE);
+  const endX = startX + Math.ceil(canvas.width/TILE)+1;
+  const endY = startY + Math.ceil(canvas.height/TILE)+1;
+
+  for (let y=startY; y<endY; y++) {
+    for (let x=startX; x<endX; x++) {
+      if (x<0||y<0||x>=MAP_W||y>=MAP_H) continue;
+      const px = x*TILE - camera.x;
+      const py = y*TILE - camera.y;
+      ctx.fillStyle = map[y][x]===1 ? '#886600' : '#2a4a2a';
+      ctx.fillRect(px, py, TILE-1, TILE-1);
+    }
+  }
+
+  // entities
+  for (const e of entities) {
+    const px = e.x*TILE - camera.x;
+    const py = e.y*TILE - camera.y;
+    const w = (e.w||1)*TILE;
+    const h = (e.h||1)*TILE;
+
+    // body
+    if (e.isBuilding) {
+      ctx.fillStyle = e.type==='conyard' ? '#446644' :
+                      e.type==='power' ? '#5555aa' :
+                      e.type==='barracks' ? '#aa5555' :
+                      e.type==='factory' ? '#888855' : '#aa8844';
+      ctx.fillRect(px, py, w, h);
+      ctx.strokeStyle = '#0f0';
+      ctx.strokeRect(px, py, w, h);
+    } else {
+      ctx.fillStyle = e.type==='tank' ? '#668866' :
+                      e.type==='harvester' ? '#aa9944' : '#88aa88';
+      ctx.beginPath();
+      ctx.arc(px+TILE/2, py+TILE/2, TILE*0.4, 0, Math.PI*2);
+      ctx.fill();
+      if (e.type==='harvester' && e.cargo>0) {
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillRect(px+8, py+4, 16*(e.cargo/e.maxCargo), 4);
+      }
+    }
+
+    // health bar
+    if (e.hp < e.maxHp) {
+      ctx.fillStyle = '#300';
+      ctx.fillRect(px, py-6, w, 4);
+      ctx.fillStyle = e.hp/e.maxHp > 0.5 ? '#0f0' : '#f00';
+      ctx.fillRect(px, py-6, w*(e.hp/e.maxHp), 4);
+    }
+
+    // selection
+    if (e.selected) {
+      ctx.strokeStyle = '#0ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px-2, py-2, w+4, h+4);
+      ctx.lineWidth = 1;
+    }
+  }
+
+  // build preview
+  if (buildMode) {
+    const tx = Math.floor(mouse.x/TILE)*TILE - camera.x;
+    const ty = Math.floor(mouse.y/TILE)*TILE - camera.y;
+    ctx.fillStyle = 'rgba(0,255,0,0.3)';
+    ctx.fillRect(tx, ty, TILE, TILE);
+  }
+
+  requestAnimationFrame(loop);
+}
+
+function updateUI() {
+  document.getElementById('credits').textContent = Math.floor(credits);
+  document.querySelectorAll('#sidebar #credits').forEach(el => el.textContent = 'Credits: ' + Math.floor(credits));
+  document.getElementById('selected').textContent = selected.length ? selected.map(s=>s.type).join(', ') : 'None';
+}
+
+// main loop
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now-last)/1000);
+  last = now;
+  update(dt);
+  draw();
+}
+updateUI();
+loop(performance.now());
+</script>
+</body>
 </html>

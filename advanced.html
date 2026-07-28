@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RA2 Clone — Full Build</title>
+    <meta name="description" content="A Red Alert 2 style real-time strategy game running entirely in the browser on HTML canvas." />
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23c8342a'/><path d='M8 22 L16 8 L24 22 Z' fill='%23ffd75e'/></svg>"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <main id="viewport">
+        <canvas id="game"></canvas>
+        <div id="messages"></div>
+        <div id="cursor-hint"></div>
+      </main>
+
+      <aside id="sidebar">
+        <header class="brand">
+          <span class="brand-mark">RA</span>
+          <span class="brand-text">
+            <strong>Red Alert 2</strong>
+            <small>browser clone</small>
+          </span>
+        </header>
+
+        <section class="stats">
+          <div class="stat-row">
+            <span class="label">Credits</span>
+            <span id="credits" class="value">$0</span>
+          </div>
+          <div class="power">
+            <div class="power-bar"><div id="power-fill"></div></div>
+            <span id="power-text" class="label">0 / 0</span>
+          </div>
+        </section>
+
+        <canvas id="minimap" width="180" height="180"></canvas>
+
+        <nav id="tabs"></nav>
+        <div id="build-list"></div>
+        <section id="selection-info"></section>
+
+        <footer id="help">
+          <div><b>LMB</b> select · <b>RMB</b> move / attack</div>
+          <div><b>Drag</b> box select · <b>A</b> attack-move · <b>S</b> stop</div>
+          <div><b>Arrows</b> / screen edge scroll · <b>H</b> base</div>
+          <div><b>Ctrl+1-9</b> set group · <b>1-9</b> recall · <b>Space</b> pause</div>
+        </footer>
+      </aside>
+    </div>
+
+    <div id="overlay" class="hidden"></div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
