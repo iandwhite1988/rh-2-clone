@@ -1,10 +1,15 @@
 # RA2 Clone
 
-A Red Alert 2 style real-time strategy game that runs entirely in the browser.
-No engine, no build step, no dependencies at runtime — just ES modules and a
-2D canvas.
+A Red Alert 2 style real-time strategy game running in the browser on a 2D
+canvas. No build step and no runtime dependencies — the repository is a static
+site that Vercel serves straight from the root.
 
-Build a base, mine ore, and destroy the enemy before they destroy you.
+There are two entry points.
+
+| Page | What it is |
+| --- | --- |
+| `/` (`index.html`) | The single-file prototype. Everything — markup, styles, game loop — lives in one HTML file. |
+| `/advanced.html` | A larger multi-file build with fog of war, pathfinding and a skirmish AI, loading `styles.css` and `src/*.js`. |
 
 ## Running it locally
 
@@ -13,63 +18,64 @@ npm install     # only pulls in a static file server for development
 npm run dev     # http://localhost:3000
 ```
 
-Any static server works. Opening `index.html` directly from the filesystem
-will **not** work, because browsers block ES module imports over `file://`.
+Any static server works. Opening the files directly over `file://` works for
+the prototype but **not** for `/advanced.html`, because browsers block ES
+module imports from the filesystem.
 
-## Controls
+## The prototype (`/`)
 
-| Input | Action |
-| --- | --- |
-| Left click | Select unit or structure |
-| Left drag | Box-select units |
-| Right click | Move, attack, or mine (set rally point when a factory is selected) |
-| `A` then click | Attack-move to a destination |
-| `S` | Stop the selected units |
-| Arrow keys / screen edge | Scroll the camera |
-| Middle drag / minimap | Pan the camera |
-| `H` | Jump to your base |
-| `Ctrl` + `1`–`9` | Assign a control group |
-| `1`–`9` | Recall a control group |
-| `Space` | Pause |
-| Double click a unit | Select every unit of that type on screen |
+Left-click selects, or places a structure once you have picked one from the
+sidebar. Right-click moves the selection. `WASD` or the arrow keys pan the
+camera.
 
-Left-click a sidebar entry to start production. When a structure finishes it
-shows **READY** — click it again, then click the map to place it. Right-click
-an entry in production to cancel it and refund what you have spent.
+Build a Refinery and a War Factory, then produce a Harvester: it drives to the
+nearest ore, fills to 700, returns to the Refinery and converts the load into
+credits. GIs need a Barracks; tanks and harvesters need a War Factory.
 
-## How the game works
+Known gaps, in rough order of how much they matter:
 
-**Economy.** Ore miners drive to the nearest ore field, fill up, and return to
-a refinery to convert cargo into credits. Production spends credits gradually
-as an item builds, so a stalled bank pauses the queue instead of failing it.
-Ore fields slowly regrow, so a long match cannot strip the map dry.
+- **There is no opponent.** Every entity is owned by player 0, so the combat
+  and attack-move code never runs and there is no win or lose condition.
+- **Placement is unchecked.** Structures can be dropped off the map, on top of
+  each other, or over the Construction Yard.
+- **The camera is unclamped**, so panning runs off into empty space.
+- **The canvas size is fixed at load**, so resizing the window leaves it
+  mismatched.
+- `id="credits"` is used twice, which is invalid HTML; it works only because
+  `updateUI()` writes to both elements.
+- The starting Power Plant at (5,5) overlaps the 2×2 Construction Yard at
+  (4,4).
+- Each harvester scans all 2,400 tiles every frame to find ore.
 
-**Power.** Power plants supply the grid; most other structures draw from it.
-When demand exceeds supply, production runs at half speed and gun turrets stop
-firing — so bombing the enemy's power plants is a real tactic.
+## The full build (`/advanced.html`)
 
-**Tech tree.** A refinery and barracks need a power plant. The war factory
-needs a refinery. Prism tanks need the factory plus a barracks. Losing a
-prerequisite cancels anything depending on it.
+**Economy.** Miners drive to the nearest ore field, fill up, and return to a
+refinery. Production spends credits gradually as an item builds, so a stalled
+bank pauses the queue. Ore fields slowly regrow.
 
-**Combat.** Weapons have per-armour multipliers: dogs shred infantry but barely
-scratch tanks, tanks hit hard against structures, prism tanks outrange
-everything at the cost of being fragile. Units defend themselves while idle but
-only chase within a short leash of where you left them.
+**Power.** Power plants supply the grid and most structures draw from it. When
+demand exceeds supply, production halves and gun turrets stop firing.
+
+**Tech tree.** Refinery and barracks need a power plant; the war factory needs
+a refinery; prism tanks need the factory plus a barracks.
+
+**Combat.** Weapons carry per-armour multipliers — dogs shred infantry but
+barely scratch tanks, prism tanks outrange everything but die fast.
 
 **Fog of war.** The map starts shrouded. Explored ground stays dimmed and
-remembers enemy structures; enemy units are only drawn while something of yours
-can actually see them.
+remembers enemy structures; enemy units are drawn only while visible.
 
-**The AI** builds a base against the same rules you do — it expands power,
-adds refineries and miners, and stages progressively larger attack waves. With
-its base gone it sends everything hunting rather than hiding.
+Controls: left-click select, left-drag box-select, right-click move/attack,
+`A` attack-move, `S` stop, arrows or screen edge to scroll, `H` to jump to
+base, `Ctrl`+`1`–`9` to set a control group, `1`–`9` to recall, `Space` to
+pause.
 
 ## Project layout
 
 ```
-index.html      page shell: canvas viewport + sidebar markup
-styles.css      dark command-panel UI
+index.html      the single-file prototype
+advanced.html   page shell for the multi-file build
+styles.css      dark command-panel UI (used by advanced.html)
 src/main.js     entry point, animation loop, restart handling
 src/game.js     world simulation: economy, production, combat, AI, victory
 src/entities.js unit + structure stats and their per-frame behaviour
@@ -79,17 +85,11 @@ src/input.js    mouse + keyboard: selection, orders, camera, placement
 src/ui.js       sidebar: build menus, resources, selection panel, overlays
 ```
 
-The simulation is deliberately separate from drawing: `game.js` never touches
-the canvas, and `renderer.js` never mutates game state. `main.js` steps the
-simulation with a clamped delta time, then draws whatever state resulted.
-
 ## Deploying
 
-The repository is a static site — there is nothing to build.
-
-On Vercel, import the repository and accept the defaults (`vercel.json` pins
-the framework preset to "other" and serves the repository root). Every push to
-`main` then redeploys automatically.
+Nothing to build. On Vercel, import the repository and accept the defaults —
+`vercel.json` pins the framework preset to "other" and serves the repository
+root. Every push to `main` redeploys.
 
 ## License
 
