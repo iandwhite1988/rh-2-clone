@@ -1,0 +1,15 @@
+{
+  "name": "repo-publisher",
+  "version": "1.0.0",
+  "description": "Publishes pasted code into GitHub repositories safely. Checks that incoming code actually fits the target repo before overwriting anything, verifies every file landed byte-for-byte, and smoke-tests the result in a real browser before reporting done.",
+  "author": {
+    "name": "iandwhite1988"
+  },
+  "keywords": [
+    "github",
+    "publish",
+    "push",
+    "code-review",
+    "verification"
+  ]
+}
